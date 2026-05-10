@@ -1,0 +1,51 @@
+sentinel/
+│
+├── backend/
+│   ├── main.py                  # FastAPI app entry point
+│   ├── chain.py                 # Hash chain logic (your core)
+│   ├── broadcast.py             # Multi-node parallel broadcast
+│   ├── quorum.py                # Quorum acceptance logic
+│   ├── escalation.py            # Priority queue / urgency scoring
+│   ├── patterns.py              # Graph clustering / BFS
+│   ├── trust.py                 # Node trust score tracking
+│   ├── models.py                # Pydantic data models
+│   ├── database.py              # PostgreSQL connection + queries
+│   ├── websocket_manager.py     # WebSocket connection manager
+│   └── utils/
+│       ├── metadata_strip.py    # EXIF + metadata removal
+│       └── hasher.py            # THIS IS WHAT WE BUILD FIRST
+│
+├── nodes/
+│   ├── node_server.py           # Single file — run 4 instances on diff ports
+│   └── node_db.py               # Each node's independent storage
+│
+├── frontend/
+│   ├── public/
+│   └── src/
+│       ├── App.jsx
+│       ├── components/
+│       │   ├── Dashboard.jsx        # Four node panels
+│       │   ├── NodePanel.jsx        # Single node status
+│       │   ├── PublicLedger.jsx     # Read-only public view
+│       │   ├── SubmitComplaint.jsx  # Whistleblower form
+│       │   ├── TamperAlert.jsx      # Red alert component
+│       │   ├── PatternGraph.jsx     # Cluster visualization
+│       │   └── TrackComplaint.jsx   # Anonymous token tracking
+│       └── utils/
+│           └── api.js
+│
+├── esp32/
+│   ├── sentinel_button.ino      # Main Arduino sketch
+│   ├── ble_handler.ino          # BLE pairing + advertisement
+│   └── power_manager.ino        # Deep sleep logic
+│
+├── packet_tracer/
+│   └── sentinel_topology.pkt    # Your CN demonstration file
+│
+├── tests/
+│   ├── test_chain.py
+│   ├── test_broadcast.py
+│   └── test_patterns.py
+│
+├── requirements.txt
+└── README.md
