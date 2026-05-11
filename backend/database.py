@@ -4,7 +4,6 @@ import time
 import sqlite3
 from typing import List, Optional
 
-# All db files will be created in backend/ folder
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 _DB_PATH = os.path.join(BACKEND_DIR, "sentinel.db")
 
@@ -21,7 +20,6 @@ def get_connection():
 def init_db():
     conn = get_connection()
     cursor = conn.cursor()
-    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS complaints (
             id INTEGER PRIMARY KEY,
@@ -37,7 +35,6 @@ def init_db():
             urgency_score REAL DEFAULT 0.0
         )
     """)
-    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS tamper_alerts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,7 +46,6 @@ def init_db():
             timestamp REAL NOT NULL
         )
     """)
-    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS node_trust (
             node_id TEXT PRIMARY KEY,
@@ -60,7 +56,6 @@ def init_db():
             trust_score REAL DEFAULT 100.0
         )
     """)
-    
     conn.commit()
     conn.close()
     print(f"Database initialized: {_DB_PATH}")
@@ -223,10 +218,9 @@ def update_node_trust(node_id: str, success: bool, response_ms: float) -> bool:
             "SELECT * FROM node_trust WHERE node_id = ?", (node_id,)
         )
         row = cursor.fetchone()
-        
         if row is None:
             cursor.execute("""
-                INSERT INTO node_trust 
+                INSERT INTO node_trust
                 (node_id, total_checks, failed_checks, avg_response_ms, last_seen, trust_score)
                 VALUES (?, 1, ?, ?, ?, ?)
             """, (node_id, 0 if success else 1, response_ms, time.time(), 100.0 if success else 80.0))
@@ -246,7 +240,6 @@ def update_node_trust(node_id: str, success: bool, response_ms: float) -> bool:
                     last_seen=?, trust_score=?
                 WHERE node_id=?
             """, (total, failed, avg_ms, time.time(), trust, node_id))
-        
         conn.commit()
         conn.close()
         return True

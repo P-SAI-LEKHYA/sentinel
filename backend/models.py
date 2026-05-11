@@ -1,5 +1,3 @@
-# backend/models.py
-
 from pydantic import BaseModel
 from typing import List, Optional
 from enum import Enum
@@ -12,6 +10,9 @@ class ComplaintStatus(str, Enum):
     PARTIALLY_REPLICATED = "PARTIALLY_REPLICATED"
     FAILED_REPLICATION = "FAILED_REPLICATION"
     UNACTIONED_DAY2 = "UNACTIONED_DAY_2"
+    TAMPERED = "TAMPERED"
+    DISAGREEING = "DISAGREEING"
+    COMPROMISED = "COMPROMISED"
 
 class ComplaintType(str, Enum):
     BRIBERY = "Bribery"
@@ -27,7 +28,6 @@ class NodeID(str, Enum):
     OMBUDSMAN = "OMBUDSMAN"
     PUBLIC = "PUBLIC"
 
-# Request model — what whistleblower sends
 class ComplaintSubmission(BaseModel):
     evidence_hash: str
     complaint_type: ComplaintType
@@ -36,7 +36,6 @@ class ComplaintSubmission(BaseModel):
     file_name: str
     file_size_bytes: int
 
-# Full complaint record stored in chain and DB
 class ComplaintRecord(BaseModel):
     id: int
     timestamp: float
@@ -50,14 +49,12 @@ class ComplaintRecord(BaseModel):
     node_acks: List[str] = []
     urgency_score: float = 0.0
 
-# What nodes send to each other during hash sync
 class HashSyncPayload(BaseModel):
     node_id: NodeID
     chain_head: str
     total_records: int
     timestamp: float
 
-# Node acknowledgement of complaint receipt
 class NodeAck(BaseModel):
     node_id: NodeID
     complaint_id: int
@@ -65,11 +62,9 @@ class NodeAck(BaseModel):
     timestamp: float
     success: bool
 
-# Anonymous tracking request
 class TrackRequest(BaseModel):
     token_hash: str
 
-# Public ledger complaint — no token_hash
 class PublicComplaintRecord(BaseModel):
     id: int
     timestamp: float
@@ -82,7 +77,6 @@ class PublicComplaintRecord(BaseModel):
     node_acks: List[str]
     urgency_score: float
 
-# Tamper alert
 class TamperAlert(BaseModel):
     detected_by_node: str
     tampered_node: str
@@ -91,7 +85,6 @@ class TamperAlert(BaseModel):
     found_hash: str
     timestamp: float
 
-# Broadcast result
 class BroadcastResult(BaseModel):
     complaint_id: int
     successful_nodes: List[str]
