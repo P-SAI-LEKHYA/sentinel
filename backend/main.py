@@ -256,7 +256,8 @@ async def verify_complaint(complaint_id: int):
     agreeing = [n for n, h in node_hashes.items() if h == our_hash]
     disagreeing = [n for n, h in node_hashes.items() if h != our_hash and h is not None]
 
-    tamper_detected = len(disagreeing) > 0
+    tamper_detected = len(actually_tampered) > 0
+
     quorum_met = len(agreeing) >= QUORUM_REQUIRED
 
     # Step 2 — for disagreeing nodes check if actually tampered
@@ -298,9 +299,9 @@ async def verify_complaint(complaint_id: int):
     verified = (not actually_compromised) and quorum_met
 
     # Step 4 — determine integrity status
-    if not tamper_detected and quorum_met:
+    if len(disagreeing) == 0 and quorum_met:
         integrity_status = "INTACT"
-    elif tamper_detected and len(actually_tampered) == 0 and quorum_met:
+    elif len(disagreeing) > 0 and len(actually_tampered) == 0 and quorum_met:
         integrity_status = "NODES_OUT_OF_SYNC"
     elif len(actually_tampered) > 0 and quorum_met:
         integrity_status = "TAMPERED_NODE_ISOLATED"
