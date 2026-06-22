@@ -57,6 +57,10 @@ active_connections: List[WebSocket] = []
 # Set of complaint IDs this node is simulating disagreement for
 _disagreeing_complaints = set()
 
+# Throttling state to prevent websocket spam
+_last_tamper_broadcast = None
+_known_mismatches = set()
+
 async def broadcast_to_dashboards(message: dict):
     disconnected = []
     for ws in active_connections:
@@ -174,15 +178,20 @@ async def mark_actioned(complaint_id: int, body: dict):
 
 @app.get("/chain/verify")
 async def verify_chain():
+    global _last_tamper_broadcast
     result = chain.verify_chain()
     if not result["valid"]:
-        await broadcast_to_dashboards({
-            "type": "TAMPER_DETECTED",
-            "node_id": NODE_ID,
-            "tampered_record": result["tampered_record"],
-            "message": result["message"],
-            "timestamp": time.time()
-        })
+        if _last_tamper_broadcast != result["tampered_record"]:
+            await broadcast_to_dashboards({
+                "type": "TAMPER_DETECTED",
+                "node_id": NODE_ID,
+                "tampered_record": result["tampered_record"],
+                "message": result["message"],
+                "timestamp": time.time()
+            })
+            _last_tamper_broadcast = result["tampered_record"]
+    else:
+        _last_tamper_broadcast = None
     return result
 
 @app.get("/chain/head")
@@ -205,6 +214,7 @@ def get_all_chain():
 
 @app.post("/sync/hash")
 async def receive_hash_sync(payload: dict):
+    global _known_mismatches
     their_node_id = payload.get("node_id")
     their_chain_head = payload.get("chain_head")
     their_total = payload.get("total_records", 0)
@@ -212,28 +222,34 @@ async def receive_hash_sync(payload: dict):
     our_total = len(chain.chain)
 
     if their_total == our_total and their_chain_head != our_chain_head:
-        alert = {
-            "detected_by_node": NODE_ID,
-            "tampered_node": their_node_id,
-            "complaint_id": our_total,
-            "expected_hash": our_chain_head,
-            "found_hash": their_chain_head,
-            "timestamp": time.time()
-        }
-        insert_tamper_alert(alert)
-        await broadcast_to_dashboards({
-            "type": "TAMPER_ALERT",
-            "detected_by": NODE_ID,
-            "suspect_node": their_node_id,
-            "our_head": our_chain_head,
-            "their_head": their_chain_head,
-            "timestamp": time.time()
-        })
+        if their_node_id not in _known_mismatches:
+            alert = {
+                "detected_by_node": NODE_ID,
+                "tampered_node": their_node_id,
+                "complaint_id": our_total,
+                "expected_hash": our_chain_head,
+                "found_hash": their_chain_head,
+                "timestamp": time.time()
+            }
+            insert_tamper_alert(alert)
+            await broadcast_to_dashboards({
+                "type": "TAMPER_ALERT",
+                "detected_by": NODE_ID,
+                "suspect_node": their_node_id,
+                "our_head": our_chain_head,
+                "their_head": their_chain_head,
+                "timestamp": time.time()
+            })
+            _known_mismatches.add(their_node_id)
+            
         return {
             "match": False,
             "alert": "HASH_MISMATCH",
             "suspect_node": their_node_id
         }
+
+    if their_node_id in _known_mismatches:
+        _known_mismatches.remove(their_node_id)
 
     return {
         "match": their_chain_head == our_chain_head,
@@ -251,8 +267,9 @@ async def simulate_tamper(complaint_id: int):
     if record is None:
         raise HTTPException(status_code=404, detail="Complaint not found")
 
-    chain.chain[complaint_id - 1]["evidence_hash"] = "TAMPERED_" + "0" * 55
-    chain.chain[complaint_id - 1]["record_hash"] = "TAMPERED_" + "0" * 55
+    pos = chain.index[complaint_id]
+    chain.chain[pos]["evidence_hash"] = "TAMPERED_" + "0" * 55
+    chain.chain[pos]["record_hash"] = "TAMPERED_" + "0" * 55
 
     update_complaint_status(complaint_id, "TAMPERED")
     chain.update_complaint_status(complaint_id, "TAMPERED", NODE_ID)

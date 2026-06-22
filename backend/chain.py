@@ -57,7 +57,7 @@ class HashChain:
         # Including it would be circular.
         record_without_self_hash = {
             k: v for k, v in record.items() 
-            if k != "record_hash"
+            if k not in ("record_hash", "status", "node_acks", "urgency_score")
         }
         
         # Serialize to JSON string with sorted keys

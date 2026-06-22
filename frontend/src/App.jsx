@@ -22,26 +22,32 @@ export default function App() {
   const [wsMessages, setWsMessages] = useState([]);
   const [alerts, setAlerts]         = useState([]);
   const [connected, setConnected]   = useState(false);
-  const wsRef = useRef(null);
+  const wsRefs = useRef({});
 
   useEffect(() => {
-    connectWebSocket();
-    return () => { if (wsRef.current) wsRef.current.close(); };
+    const ports = [8000, 8001, 8002, 8003, 8004];
+    ports.forEach(connectWebSocket);
+    return () => { 
+      Object.values(wsRefs.current).forEach(ws => ws.close()); 
+    };
   }, []); // eslint-disable-line
 
-  function connectWebSocket() {
+  function connectWebSocket(port) {
     try {
-      const ws = new WebSocket("ws://localhost:8000/ws");
-      wsRef.current = ws;
-      ws.onopen  = () => setConnected(true);
-      ws.onclose = () => { setConnected(false); setTimeout(connectWebSocket, 3000); };
+      const ws = new WebSocket(`ws://localhost:${port}/ws`);
+      wsRefs.current[port] = ws;
+      ws.onopen  = () => { if (port === 8000) setConnected(true); };
+      ws.onclose = () => { 
+        if (port === 8000) setConnected(false); 
+        setTimeout(() => connectWebSocket(port), 3000); 
+      };
       ws.onerror = () => ws.close();
       ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
         setWsMessages((prev) => [msg, ...prev].slice(0, 100));
         if (["TAMPER_ALERT","TAMPER_SIMULATED","QUORUM_FAILED","TAMPER_DETECTED"].includes(msg.type)) {
           setAlerts((prev) => [
-            { id: Date.now(), type: msg.type, message: getTamperMessage(msg), timestamp: new Date().toLocaleTimeString() },
+            { id: Date.now() + Math.random(), type: msg.type, message: getTamperMessage(msg), timestamp: new Date().toLocaleTimeString() },
             ...prev,
           ].slice(0, 5));
         }
