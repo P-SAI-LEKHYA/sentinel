@@ -256,8 +256,6 @@ async def verify_complaint(complaint_id: int):
     agreeing = [n for n, h in node_hashes.items() if h == our_hash]
     disagreeing = [n for n, h in node_hashes.items() if h != our_hash and h is not None]
 
-    tamper_detected = len(actually_tampered) > 0
-
     quorum_met = len(agreeing) >= QUORUM_REQUIRED
 
     # Step 2 — for disagreeing nodes check if actually tampered
@@ -293,6 +291,8 @@ async def verify_complaint(complaint_id: int):
 
     actually_tampered = [nid for nid, is_tampered in chain_results if is_tampered]
     out_of_sync = [nid for nid, is_tampered in chain_results if not is_tampered]
+
+    tamper_detected = len(actually_tampered) > 0
 
     # Step 3 — verified is based on actual tampering not just disagreement
     actually_compromised = len(actually_tampered) > 0
@@ -407,6 +407,49 @@ def get_public_ledger():
 @app.get("/ledger/verify")
 def verify_full_chain():
     return main_chain.verify_chain()
+
+@app.get("/stats")
+def get_stats():
+    complaints = get_all_complaints()
+    status_counts = {}
+    type_counts = {}
+    alerts_today = 0
+    for c in complaints:
+        status = c.get("status", "PENDING")
+        status_counts[status] = status_counts.get(status, 0) + 1
+        ctype = c.get("complaint_type", "Other")
+        type_counts[ctype] = type_counts.get(ctype, 0) + 1
+        if c.get("urgency_score", 0.0) > 70.0:
+            alerts_today += 1
+    return {
+        "status_counts": status_counts,
+        "type_counts": type_counts,
+        "alerts_today": alerts_today,
+        "total": len(complaints)
+    }
+
+@app.get("/nodes/health")
+async def get_nodes_health():
+    health = {}
+    async def check_health(node_id, url):
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                res = await client.get(f"{url}/status")
+                if res.status_code == 200:
+                    data = res.json()
+                    return node_id, {
+                        "online": True,
+                        "chain_valid": data.get("chain_valid", True),
+                        "simulating_disagreement": data.get("simulating_disagreement", False)
+                    }
+        except Exception:
+            pass
+        return node_id, {"online": False}
+    tasks = [check_health(node_id, url) for node_id, url in NODE_URLS.items()]
+    results = await asyncio.gather(*tasks)
+    for node_id, status in results:
+        health[node_id] = status
+    return health
 
 # ─── Escalation ───────────────────────────────────────────────────
 
